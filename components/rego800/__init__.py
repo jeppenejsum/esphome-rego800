@@ -30,6 +30,7 @@ async def to_code(config):
     await cg.register_component(var, config)
     
     canbus_component = await cg.get_variable(config[CONF_CANBUS_ID])
+    cg.add(var.set_canbus(canbus_component))
     # The callback receives: (uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data)
     callback = cg.RawExpression(
         f"""[=](uint32_t can_id, bool extended_id, bool rtr, const std::vector<uint8_t> &data) {{
