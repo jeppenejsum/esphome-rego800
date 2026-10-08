@@ -70,6 +70,26 @@ void Rego800::loop() {
     }
   }
 
+#ifdef USE_NUMBER
+  // First poll 10 s after boot, then every poll interval.
+  uint32_t poll_due = this->polled_once_ ? this->poll_interval_ms_ : 10000;
+  if (!this->numbers_.empty() && now - this->poll_last_ms_ >= poll_due) {
+    this->poll_last_ms_ = now;
+    this->polled_once_ = true;
+    for (auto *number : this->numbers_)
+      this->request_read(number->get_address());
+  }
+#endif
+
+  if (!this->scanning_ && !this->read_queue_.empty() &&
+      now - this->read_last_send_ms_ >= 50) {
+    uint16_t address = this->read_queue_.front();
+    this->read_queue_.pop_front();
+    this->read_last_send_ms_ = now;
+    this->canbus_->send_data(REQUEST_BASE | (uint32_t(address) << 14), true,
+                             true, {});
+  }
+
   if (!this->scanning_ || now - this->scan_last_send_ms_ < this->scan_interval_ms_)
     return;
 
@@ -100,6 +120,31 @@ void Rego800::loop() {
   }
   this->scan_last_send_ms_ = now;
   this->scan_next_++;
+}
+
+void Rego800::request_read(uint16_t address) {
+  if (this->canbus_ == nullptr)
+    return;
+  if (std::find(this->read_queue_.begin(), this->read_queue_.end(), address) ==
+      this->read_queue_.end())
+    this->read_queue_.push_back(address);
+}
+
+void Rego800::write_variable(uint16_t address, uint8_t size, int32_t raw) {
+  if (this->canbus_ == nullptr)
+    return;
+  std::vector<uint8_t> data;
+  for (int i = size - 1; i >= 0; i--)
+    data.push_back((raw >> (8 * i)) & 0xFF);
+  char hex[25];
+  format_payload(data.data(), data.size(), hex);
+  ESP_LOGI(TAG, "WRITE 0x%03X = %" PRId32 " (%s)", address, raw, hex);
+  this->canbus_->send_data(REQUEST_BASE | (uint32_t(address) << 14), true,
+                           false, data);
+  // Read back after a second so the entity shows what the controller stored.
+  // Keyed by address so a burst of writes to one variable reads back once.
+  this->set_timeout(0x52450000u | address, 1000,
+                    [this, address]() { this->request_read(address); });
 }
 
 void Rego800::dump_scan() {
@@ -340,6 +385,16 @@ void Rego800::on_frame(uint32_t can_id, bool rtr,
       ESP_LOGI(TAG, "NAMES info: %u bytes, %u entries (if 0x7F5 means that)",
                (data[2] << 8) | data[3], (data[4] << 8) | data[5]);
     }
+#ifdef USE_NUMBER
+    for (auto *number : this->numbers_) {
+      if (number->get_address() == var) {
+        char hex[25];
+        format_payload(data.data(), data.size(), hex);
+        ESP_LOGD(TAG, "READ 0x%03X = %s", var, hex);
+        number->handle_reply(data);
+      }
+    }
+#endif
     if (this->scan_table_ != nullptr && var < SCAN_VARS) {
       this->handle_scan_reply_(var, data);
       return;
@@ -402,6 +457,35 @@ void Rego800::on_frame(uint32_t can_id, bool rtr,
 #endif
   }
 }
+
+#ifdef USE_NUMBER
+void Rego800Number::handle_reply(const std::vector<uint8_t> &data) {
+  if (data.size() < this->size_)
+    return;
+  uint32_t value = 0;
+  for (uint8_t i = 0; i < this->size_; i++)
+    value = (value << 8) | data[i];
+  int32_t raw = (int32_t) value;
+  if (this->signed_ && this->size_ < 4) {
+    uint32_t sign_bit = 1u << (8 * this->size_ - 1);
+    if (value & sign_bit)
+      raw = (int32_t) (value | ~((sign_bit << 1) - 1));
+  }
+  this->has_raw_ = true;
+  this->raw_ = raw;
+  this->publish_state(raw * this->multiplier_);
+}
+
+void Rego800Number::control(float value) {
+  int32_t raw = (int32_t) lroundf(value / this->multiplier_);
+  // Controller settings live in non-volatile memory; skip no-op writes.
+  if (this->has_raw_ && raw == this->raw_) {
+    this->publish_state(raw * this->multiplier_);
+    return;
+  }
+  this->parent_->write_variable(this->address_, this->size_, raw);
+}
+#endif
 
 } // namespace rego800
 } // namespace esphome

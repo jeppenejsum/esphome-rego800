@@ -17,6 +17,11 @@
 #ifdef USE_TEXT_SENSOR
 #include "esphome/components/text_sensor/text_sensor.h"
 #endif
+#ifdef USE_NUMBER
+#include "esphome/components/number/number.h"
+#endif
+
+#include <deque>
 
 namespace esphome {
 namespace rego800 {
@@ -25,6 +30,10 @@ enum Rego800SensorType {
   REGULAR,
   THERMISTOR,
 };
+
+#ifdef USE_NUMBER
+class Rego800Number;
+#endif
 
 class Rego800 : public Component {
 public:
@@ -70,6 +79,18 @@ public:
   // Request the controller's variable-name table (var 0x7F6, which streams
   // many frames) and log it as parsed entries once it has arrived.
   void read_names();
+
+  // Controller variables are byte addresses; see docs/ for the name table.
+  void request_read(uint16_t address);
+  void write_variable(uint16_t address, uint8_t size, int32_t raw);
+  void set_poll_interval(uint32_t ms) { this->poll_interval_ms_ = ms; }
+  // Re-read all number entities now instead of waiting for the next poll.
+  void poll_now() { this->poll_last_ms_ = millis() - this->poll_interval_ms_; }
+#ifdef USE_NUMBER
+  void register_number(Rego800Number *number) {
+    this->numbers_.push_back(number);
+  }
+#endif
 
 #ifdef USE_SENSOR
   void register_sensor(uint32_t can_id, sensor::Sensor *sensor,
@@ -160,7 +181,43 @@ protected:
   PrintMode print_mode_{PRINT_NONE};
   size_t print_pos_{0};
   uint32_t print_last_ms_{0};
+
+  // Reads queued by request_read(), sent one at a time between scan requests.
+  std::deque<uint16_t> read_queue_;
+  uint32_t read_last_send_ms_{0};
+  uint32_t poll_interval_ms_{60000};
+  uint32_t poll_last_ms_{0};
+  bool polled_once_{false};
+#ifdef USE_NUMBER
+  std::vector<Rego800Number *> numbers_;
+#endif
 };
+
+#ifdef USE_NUMBER
+// A writable controller variable. The value is read on the poll interval; a
+// change from Home Assistant is written once and then read back, so the state
+// always reflects what the controller reports.
+class Rego800Number : public number::Number, public Parented<Rego800> {
+public:
+  void set_address(uint16_t address) { this->address_ = address; }
+  void set_size(uint8_t size) { this->size_ = size; }
+  void set_signed(bool is_signed) { this->signed_ = is_signed; }
+  void set_multiplier(float multiplier) { this->multiplier_ = multiplier; }
+  uint16_t get_address() const { return this->address_; }
+
+  void handle_reply(const std::vector<uint8_t> &data);
+
+protected:
+  void control(float value) override;
+
+  uint16_t address_{0};
+  uint8_t size_{1};
+  bool signed_{false};
+  float multiplier_{1.0f};
+  bool has_raw_{false};
+  int32_t raw_{0};
+};
+#endif
 
 } // namespace rego800
 } // namespace esphome

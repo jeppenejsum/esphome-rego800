@@ -10,7 +10,14 @@
 #
 # Flag meanings are not confirmed. Observed: 0E = measured temperature
 # (int16, x0.1 C); 6E = temperature setting; 61 = 1-byte setting.
-# Confirmed by changing it on the panel: 0x2BC VARMESASONG_TEMP (1 byte, C).
+# Confirmed by reading and writing (number.py presets):
+#   0x2BC VARMESASONG_TEMP    1 byte, C
+#   0x275 RADKURVA_VANSTER_Y  2 bytes, x0.1 C (curve end at +20 C outdoor)
+#   0x271 RADKURVA_HOGER_Y    2 bytes, x0.1 C (curve end at -35 C outdoor)
+# Read matches the panel (+20 C point = left end + Y12); writes not yet
+# checked against the panel:
+#   0x278 RADKURVA_Y1..Y12    2 bytes signed, x0.1 C, adjustments at -35..+20 C
+# Writes: a data frame on the same ID as the read request.
 #
 0x000 flags=62 ACCESS_LEVEL
 0x002 flags=00 AHB9012_ALIVE

@@ -15,6 +15,7 @@ CONF_REGO800_ID = "rego800_id"
 CONF_CANBUS_ID = "canbus_id"
 CONF_IGNORE_IDS = "ignore_ids"
 CONF_SNIFF = "sniff"
+CONF_POLL_INTERVAL = "poll_interval"
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -22,6 +23,9 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
         cv.Optional(CONF_IGNORE_IDS): cv.ensure_list(cv.hex_uint32_t),
         cv.Optional(CONF_SNIFF, default=False): cv.boolean,
+        cv.Optional(
+            CONF_POLL_INTERVAL, default="60s"
+        ): cv.positive_time_period_milliseconds,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -44,3 +48,5 @@ async def to_code(config):
 
     if config[CONF_SNIFF]:
         cg.add(var.set_sniff(True))
+
+    cg.add(var.set_poll_interval(config[CONF_POLL_INTERVAL].total_milliseconds))

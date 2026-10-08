@@ -11,6 +11,8 @@ An ESPHome external component for reading data from **Rego 800** heat pump contr
 - ⚡ Read pump and compressor frequencies
 - 🔘 Binary sensors for pump/fan status
 - 📝 Text sensors with value mapping (e.g., 3-way valve position)
+- 🎛️ Read and write controller settings (heating season limit, heat curve) as number entities
+- 🔍 Tools for decoding the bus: sniff mode, variable scan and the controller's own name table
 - 🔧 Easily extensible with custom CAN IDs
 - 🏠 Full Home Assistant integration
 
@@ -140,6 +142,76 @@ sensor:
 | Variable | CAN ID | Description |
 |----------|--------|-------------|
 | THREEWAY_VALVE | 0x804c040 | 3-way valve position |
+
+## Settings (number.py)
+
+Besides the broadcast values above, the controller answers requests for its
+internal variables, and accepts writes to them. Variables are byte addresses:
+a remote request on `1 << 26 | address << 14 | 0x3FE0` is answered with a data
+frame on the same ID, and a data frame sent to that ID writes the value.
+
+Writing requires the ESP to transmit. On a T-CAN485 the transceiver only
+receives until GPIO23 is driven low:
+
+```yaml
+switch:
+  - platform: gpio
+    pin: GPIO23          # transceiver speed/standby pin: LOW = can transmit
+    internal: true
+    restore_mode: ALWAYS_OFF
+  - platform: gpio
+    pin: GPIO16          # ME2107 boost supply for the CAN side
+    internal: true
+    restore_mode: ALWAYS_ON
+
+rego800:
+  canbus_id: my_canbus
+  poll_interval: 10s     # how often settings are re-read (default 60s)
+
+number:
+  - platform: rego800
+    rego_variable: VARMESASONG_TEMP
+    name: "Heating season limit"
+  - platform: rego800
+    rego_variable: RADKURVA_VANSTER_Y
+    name: "Heat curve left end"
+```
+
+Each number is re-read on `poll_interval`, so changes made on the panel show
+up in Home Assistant. A change from Home Assistant is written once and read
+back a second later; writes of an unchanged value are skipped, since the
+controller stores settings in non-volatile memory with limited write cycles.
+
+| Variable | Address | Format | Description |
+|----------|---------|--------|-------------|
+| VARMESASONG_TEMP | 0x2BC | 1 byte, °C | Heating season limit |
+| RADKURVA_VANSTER_Y | 0x275 | 2 bytes, ×0.1 °C | Heat curve left end (+20 °C outdoor) |
+| RADKURVA_HOGER_Y | 0x271 | 2 bytes, ×0.1 °C | Heat curve right end (−35 °C outdoor) |
+| RADKURVA_Y1 … Y12 | 0x278 … 0x28E | 2 bytes signed, ×0.1 °C | Local curve adjustments at −35 … +20 °C outdoor, 5 °C apart |
+
+The panel shows a curve point as end point plus adjustment: a left end of 29.4
+with Y12 at −10.0 reads as 19 at +20 °C. Addresses come from firmware 2.21.0
+and may differ on other versions. Other variables can be used with `address`,
+`size`, `signed`, `multiplier`, `min_value`, `max_value` and `step`.
+
+## Decoding tools
+
+With `sniff: true` the component logs CAN IDs that no sensor uses, when first
+seen and whenever their payload changes. It also exposes these methods for
+template buttons:
+
+- `id(rego).dump_sniff()` lists every unmapped ID seen so far.
+- `id(rego).start_scan(0x000, 0x7FF)` reads every controller variable. The
+  first scan records a baseline; later scans log only the variables that
+  changed, so changing one setting on the panel between two scans finds it.
+- `id(rego).dump_scan()` lists the recorded scan values.
+- `id(rego).read_names()` reads the controller's variable-name table (var
+  0x7F6) and logs it. It arrives as a burst of ~1700 frames, so set
+  `rx_queue_len: 64` on the `canbus`.
+- `id(rego).poll_now()` re-reads all number entities immediately.
+
+[docs/rego800-2.21.0-variables.txt](docs/rego800-2.21.0-variables.txt) holds
+the name table read from firmware 2.21.0.
 
 ## Troubleshooting
 
