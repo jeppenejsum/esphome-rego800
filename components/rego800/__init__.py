@@ -14,12 +14,14 @@ Rego800SensorType = rego800_ns.enum("Rego800SensorType")
 CONF_REGO800_ID = "rego800_id"
 CONF_CANBUS_ID = "canbus_id"
 CONF_IGNORE_IDS = "ignore_ids"
+CONF_SNIFF = "sniff"
 
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(Rego800),
         cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.CanbusComponent),
         cv.Optional(CONF_IGNORE_IDS): cv.ensure_list(cv.hex_uint32_t),
+        cv.Optional(CONF_SNIFF, default=False): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -38,3 +40,6 @@ async def to_code(config):
     
     if CONF_IGNORE_IDS in config:
         cg.add(var.set_ignore_ids(config[CONF_IGNORE_IDS]))
+
+    if config[CONF_SNIFF]:
+        cg.add(var.set_sniff(True))

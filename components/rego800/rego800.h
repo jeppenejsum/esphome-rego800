@@ -55,6 +55,9 @@ public:
   void set_ignore_ids(std::vector<uint32_t> ids) {
     this->ignore_ids_ = std::move(ids);
   }
+  void set_sniff(bool sniff) { this->sniff_ = sniff; }
+  // Log every unmapped CAN ID seen so far with its last payload.
+  void dump_sniff();
 
 #ifdef USE_SENSOR
   void register_sensor(uint32_t can_id, sensor::Sensor *sensor,
@@ -96,6 +99,13 @@ protected:
 #endif
 
   std::vector<uint32_t> ignore_ids_;
+
+  // Sniff mode: log unmapped CAN IDs when first seen and whenever their
+  // payload changes, to help decode the protocol.
+  bool is_mapped_(uint32_t can_id) const;
+  void sniff_frame_(uint32_t can_id, bool rtr, const std::vector<uint8_t> &data);
+  bool sniff_{false};
+  std::map<uint32_t, std::vector<uint8_t>> sniff_last_;
 };
 
 } // namespace rego800
