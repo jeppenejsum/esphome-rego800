@@ -2,6 +2,7 @@
 #include "esphome/core/log.h"
 #include "rego800_lut.h"
 #include <algorithm>
+#include <cinttypes>
 
 namespace esphome {
 namespace rego800 {
@@ -17,26 +18,26 @@ void Rego800::dump_config() {
   if (!this->ignore_ids_.empty()) {
     ESP_LOGCONFIG(TAG, "  Ignored CAN IDs:");
     for (auto id : this->ignore_ids_) {
-      ESP_LOGCONFIG(TAG, "    - 0x%08X", id);
+      ESP_LOGCONFIG(TAG, "    - 0x%08" PRIX32, id);
     }
   }
 
 #ifdef USE_SENSOR
   for (auto const &it : this->sensors_) {
-    ESP_LOGCONFIG(TAG, "  Sensor 0x%08X: %s (%s)", it.first,
+    ESP_LOGCONFIG(TAG, "  Sensor 0x%08" PRIX32 ": %s (%s)", it.first,
                   it.second.sensor->get_name().c_str(),
                   it.second.type == THERMISTOR ? "Thermistor" : "Regular");
   }
 #endif
 #ifdef USE_BINARY_SENSOR
   for (auto const &it : this->binary_sensors_) {
-    ESP_LOGCONFIG(TAG, "  Binary Sensor 0x%08X: %s", it.first,
+    ESP_LOGCONFIG(TAG, "  Binary Sensor 0x%08" PRIX32 ": %s", it.first,
                   it.second->get_name().c_str());
   }
 #endif
 #ifdef USE_TEXT_SENSOR
   for (auto const &it : this->text_sensors_) {
-    ESP_LOGCONFIG(TAG, "  Text Sensor 0x%08X: %s", it.first,
+    ESP_LOGCONFIG(TAG, "  Text Sensor 0x%08" PRIX32 ": %s", it.first,
                   it.second.text_sensor->get_name().c_str());
   }
 #endif
@@ -53,7 +54,7 @@ void Rego800::on_frame(uint32_t can_id, bool rtr,
   }
 
   uint8_t dlc = data.size();
-  ESP_LOGV(TAG, "Received frame 0x%08X DLC=%u", can_id, dlc);
+  ESP_LOGV(TAG, "Received frame 0x%08" PRIX32 " DLC=%u", can_id, dlc);
 
   if (dlc == 1) {
     uint8_t val = data[0];
