@@ -91,6 +91,31 @@ public:
     this->numbers_.push_back(number);
   }
 #endif
+  // Parse a big-endian controller value of size 1, 2 or 4 bytes.
+  static bool parse_value(const std::vector<uint8_t> &data, uint8_t size,
+                          bool is_signed, int32_t &raw);
+#ifdef USE_SENSOR
+  // A read-only controller variable, re-read on the poll interval.
+  void register_polled_sensor(uint16_t address, uint8_t size, bool is_signed,
+                              float multiplier, sensor::Sensor *sensor) {
+    PolledVariable v;
+    v.address = address;
+    v.size = size;
+    v.is_signed = is_signed;
+    v.multiplier = multiplier;
+    v.sensor = sensor;
+    this->polled_.push_back(v);
+  }
+#endif
+#ifdef USE_BINARY_SENSOR
+  void register_polled_binary_sensor(uint16_t address,
+                                     binary_sensor::BinarySensor *sensor) {
+    PolledVariable v;
+    v.address = address;
+    v.binary_sensor = sensor;
+    this->polled_.push_back(v);
+  }
+#endif
 
 #ifdef USE_SENSOR
   void register_sensor(uint32_t can_id, sensor::Sensor *sensor,
@@ -191,6 +216,20 @@ protected:
 #ifdef USE_NUMBER
   std::vector<Rego800Number *> numbers_;
 #endif
+  struct PolledVariable {
+    uint16_t address{0};
+    uint8_t size{1};
+    bool is_signed{false};
+    float multiplier{1.0f};
+#ifdef USE_SENSOR
+    sensor::Sensor *sensor{nullptr};
+#endif
+#ifdef USE_BINARY_SENSOR
+    binary_sensor::BinarySensor *binary_sensor{nullptr};
+#endif
+  };
+  std::vector<PolledVariable> polled_;
+  void handle_polled_reply_(uint16_t address, const std::vector<uint8_t> &data);
 };
 
 #ifdef USE_NUMBER

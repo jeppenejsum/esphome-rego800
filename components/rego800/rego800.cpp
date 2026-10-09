@@ -70,16 +70,18 @@ void Rego800::loop() {
     }
   }
 
-#ifdef USE_NUMBER
   // First poll 10 s after boot, then every poll interval.
   uint32_t poll_due = this->polled_once_ ? this->poll_interval_ms_ : 10000;
-  if (!this->numbers_.empty() && now - this->poll_last_ms_ >= poll_due) {
+  if (now - this->poll_last_ms_ >= poll_due) {
     this->poll_last_ms_ = now;
     this->polled_once_ = true;
+#ifdef USE_NUMBER
     for (auto *number : this->numbers_)
       this->request_read(number->get_address());
-  }
 #endif
+    for (auto &v : this->polled_)
+      this->request_read(v.address);
+  }
 
   if (!this->scanning_ && !this->read_queue_.empty() &&
       now - this->read_last_send_ms_ >= 50) {
@@ -395,6 +397,7 @@ void Rego800::on_frame(uint32_t can_id, bool rtr,
       }
     }
 #endif
+    this->handle_polled_reply_(var, data);
     if (this->scan_table_ != nullptr && var < SCAN_VARS) {
       this->handle_scan_reply_(var, data);
       return;
@@ -458,19 +461,49 @@ void Rego800::on_frame(uint32_t can_id, bool rtr,
   }
 }
 
-#ifdef USE_NUMBER
-void Rego800Number::handle_reply(const std::vector<uint8_t> &data) {
-  if (data.size() < this->size_)
-    return;
+bool Rego800::parse_value(const std::vector<uint8_t> &data, uint8_t size,
+                          bool is_signed, int32_t &raw) {
+  if (data.size() < size)
+    return false;
   uint32_t value = 0;
-  for (uint8_t i = 0; i < this->size_; i++)
+  for (uint8_t i = 0; i < size; i++)
     value = (value << 8) | data[i];
-  int32_t raw = (int32_t) value;
-  if (this->signed_ && this->size_ < 4) {
-    uint32_t sign_bit = 1u << (8 * this->size_ - 1);
+  raw = (int32_t) value;
+  if (is_signed && size < 4) {
+    uint32_t sign_bit = 1u << (8 * size - 1);
     if (value & sign_bit)
       raw = (int32_t) (value | ~((sign_bit << 1) - 1));
   }
+  return true;
+}
+
+void Rego800::handle_polled_reply_(uint16_t address,
+                                   const std::vector<uint8_t> &data) {
+  for (auto &v : this->polled_) {
+    if (v.address != address)
+      continue;
+    int32_t raw;
+    if (!parse_value(data, v.size, v.is_signed, raw))
+      continue;
+    char hex[25];
+    format_payload(data.data(), data.size(), hex);
+    ESP_LOGD(TAG, "READ 0x%03X = %s", address, hex);
+#ifdef USE_SENSOR
+    if (v.sensor != nullptr)
+      v.sensor->publish_state(raw * v.multiplier);
+#endif
+#ifdef USE_BINARY_SENSOR
+    if (v.binary_sensor != nullptr)
+      v.binary_sensor->publish_state(raw != 0);
+#endif
+  }
+}
+
+#ifdef USE_NUMBER
+void Rego800Number::handle_reply(const std::vector<uint8_t> &data) {
+  int32_t raw;
+  if (!Rego800::parse_value(data, this->size_, this->signed_, raw))
+    return;
   this->has_raw_ = true;
   this->raw_ = raw;
   this->publish_state(raw * this->multiplier_);

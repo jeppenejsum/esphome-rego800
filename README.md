@@ -11,6 +11,7 @@ An ESPHome external component for reading data from **Rego 800** heat pump contr
 - ⚡ Read pump and compressor frequencies
 - 🔘 Binary sensors for pump/fan status
 - 📝 Text sensors with value mapping (e.g., 3-way valve position)
+- 📈 Read controller variables that are not broadcast (flow setpoint, compressor drive, alarms)
 - 🎛️ Read and write controller settings (heating season limit, heat curve) as number entities
 - 🔍 Tools for decoding the bus: sniff mode, variable scan and the controller's own name table
 - 🔧 Easily extensible with custom CAN IDs
@@ -142,6 +143,25 @@ sensor:
 | Variable | CAN ID | Description |
 |----------|--------|-------------|
 | THREEWAY_VALVE | 0x804c040 | 3-way valve position |
+
+### Polled controller variables
+
+These are not broadcast; they are read from the controller on `poll_interval`
+(see [Settings](#settings-numberpy) for the request scheme), and need the ESP
+to transmit. Other variables can be used with `address`, `size`, `signed` and
+`multiplier` (sensor) or `address` (binary sensor, non-zero = on).
+
+| Variable | Platform | Address | Format | Description |
+|----------|----------|---------|--------|-------------|
+| RAD_BORVARDE | sensor | 0x25E | 2 bytes signed, ×0.1 °C | Calculated flow temperature setpoint |
+| HW_KOMP_CURRENT | sensor | 0x20B | 2 bytes, ×0.1 A | Compressor drive current (0 when stopped, ~8.5 A at 48 Hz). Whether this is DC-bus or motor current is not confirmed, so V × A is not a verified power figure. |
+| HW_KOMP_VOLTAGE | sensor | 0x21D | 2 bytes, V | Inverter DC-bus voltage (~566 V idle, sags ~15 V under load) |
+| KOMP_LARM | binary_sensor | 0x244 | 1 byte | Compressor alarm |
+| LARM_MODE | binary_sensor | 0x24C | 1 byte | Alarm mode |
+| FRYSVAKT | binary_sensor | 0x172 | 1 byte | Freeze protection active |
+
+The alarm meanings are inferred from the variable names; they read 0 with no
+alarm on the panel, but have not been seen in the on state.
 
 ## Settings (number.py)
 

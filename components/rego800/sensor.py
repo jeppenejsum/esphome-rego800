@@ -4,15 +4,21 @@ import esphome.config_validation as cv
 from esphome.components import sensor
 
 from esphome.const import (
+    CONF_ADDRESS,
     CONF_ID,
+    CONF_SIZE,
     CONF_TYPE,
     CONF_UNIT_OF_MEASUREMENT,
     CONF_ACCURACY_DECIMALS,
     CONF_DEVICE_CLASS,
     CONF_STATE_CLASS,
+    UNIT_AMPERE,
     UNIT_CELSIUS,
     UNIT_HERTZ,
+    UNIT_VOLT,
+    DEVICE_CLASS_CURRENT,
     DEVICE_CLASS_FREQUENCY,
+    DEVICE_CLASS_VOLTAGE,
     DEVICE_CLASS_TEMPERATURE,
     STATE_CLASS_MEASUREMENT,
 )
@@ -22,6 +28,8 @@ DEPENDENCIES = ["rego800"]
 
 CONF_REGO_VARIABLE = "rego_variable"
 CONF_CAN_ID = "can_id"
+CONF_SIGNED = "signed"
+CONF_MULTIPLIER = "multiplier"
 
 REGO_VARIABLES = {
     # Temperature sensors (DLC=2, Thermistor)
@@ -38,6 +46,16 @@ REGO_VARIABLES = {
     "HEAT_FLUID_PUMP": {CONF_CAN_ID: 0x8070040, CONF_TYPE: "REGULAR", CONF_UNIT_OF_MEASUREMENT: UNIT_HERTZ, CONF_ACCURACY_DECIMALS: 0, CONF_DEVICE_CLASS: DEVICE_CLASS_FREQUENCY, CONF_STATE_CLASS: STATE_CLASS_MEASUREMENT},
     "COLD_FLUID_PUMP": {CONF_CAN_ID: 0x8074040, CONF_TYPE: "REGULAR", CONF_UNIT_OF_MEASUREMENT: UNIT_HERTZ, CONF_ACCURACY_DECIMALS: 0, CONF_DEVICE_CLASS: DEVICE_CLASS_FREQUENCY, CONF_STATE_CLASS: STATE_CLASS_MEASUREMENT},
     "COMPRESSOR": {CONF_CAN_ID: 0x80bc040, CONF_TYPE: "REGULAR", CONF_UNIT_OF_MEASUREMENT: UNIT_HERTZ, CONF_ACCURACY_DECIMALS: 0, CONF_DEVICE_CLASS: DEVICE_CLASS_FREQUENCY, CONF_STATE_CLASS: STATE_CLASS_MEASUREMENT},
+    # Controller variables read on the rego800 poll_interval. Addresses and
+    # sizes come from the name table (docs/rego800-2.21.0-variables.txt);
+    # scaling is inferred from the flag byte and not yet checked against the
+    # panel.
+    # Calculated flow temperature setpoint (flags 0E: signed x0.1 °C).
+    "RAD_BORVARDE": {CONF_ADDRESS: 0x25E, CONF_SIZE: 2, CONF_SIGNED: True, CONF_MULTIPLIER: 0.1, CONF_UNIT_OF_MEASUREMENT: UNIT_CELSIUS, CONF_ACCURACY_DECIMALS: 1, CONF_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE},
+    # Compressor drive current (flags 0A, scale guessed as x0.1 A).
+    "HW_KOMP_CURRENT": {CONF_ADDRESS: 0x20B, CONF_SIZE: 2, CONF_SIGNED: False, CONF_MULTIPLIER: 0.1, CONF_UNIT_OF_MEASUREMENT: UNIT_AMPERE, CONF_ACCURACY_DECIMALS: 1, CONF_DEVICE_CLASS: DEVICE_CLASS_CURRENT},
+    # Compressor drive voltage (flags 02: unsigned 16-bit, unit guessed as V).
+    "HW_KOMP_VOLTAGE": {CONF_ADDRESS: 0x21D, CONF_SIZE: 2, CONF_SIGNED: False, CONF_MULTIPLIER: 1.0, CONF_UNIT_OF_MEASUREMENT: UNIT_VOLT, CONF_ACCURACY_DECIMALS: 0, CONF_DEVICE_CLASS: DEVICE_CLASS_VOLTAGE},
 }
 
 CONFIG_SCHEMA = sensor.sensor_schema(state_class=STATE_CLASS_MEASUREMENT).extend(
@@ -46,18 +64,22 @@ CONFIG_SCHEMA = sensor.sensor_schema(state_class=STATE_CLASS_MEASUREMENT).extend
         cv.Optional(CONF_REGO_VARIABLE): cv.enum(REGO_VARIABLES),
         cv.Optional(CONF_CAN_ID): cv.hex_uint32_t,
         cv.Optional(CONF_TYPE): cv.enum({"REGULAR": "REGULAR", "THERMISTOR": "THERMISTOR"}),
+        cv.Optional(CONF_ADDRESS): cv.int_range(min=0, max=0xFFF),
+        cv.Optional(CONF_SIZE): cv.one_of(1, 2, 4, int=True),
+        cv.Optional(CONF_SIGNED): cv.boolean,
+        cv.Optional(CONF_MULTIPLIER): cv.float_,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
 def validate_config(config):
-    if CONF_REGO_VARIABLE not in config and CONF_CAN_ID not in config:
-        raise cv.Invalid("Must specify either rego_variable or can_id")
-    if CONF_REGO_VARIABLE in config and CONF_CAN_ID in config:
-        raise cv.Invalid("Cannot specify both rego_variable and can_id")
+    sources = [k for k in (CONF_REGO_VARIABLE, CONF_CAN_ID, CONF_ADDRESS) if k in config]
+    if len(sources) != 1:
+        raise cv.Invalid("Specify exactly one of rego_variable, can_id or address")
     
     if CONF_REGO_VARIABLE in config:
         var_data = REGO_VARIABLES[config[CONF_REGO_VARIABLE]]
-        for key in [CONF_UNIT_OF_MEASUREMENT, CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_TYPE]:
+        for key in [CONF_UNIT_OF_MEASUREMENT, CONF_ACCURACY_DECIMALS, CONF_DEVICE_CLASS, CONF_TYPE,
+                    CONF_ADDRESS, CONF_SIZE, CONF_SIGNED, CONF_MULTIPLIER]:
             if key in var_data and key not in config:
                 config[key] = var_data[key]
                 
@@ -72,6 +94,16 @@ async def to_code(config):
     var = await sensor.new_sensor(config)
     
     rego = await cg.get_variable(config[CONF_REGO800_ID])
+
+    polled = dict(config)
+    if CONF_REGO_VARIABLE in config:
+        for key, value in REGO_VARIABLES[config[CONF_REGO_VARIABLE]].items():
+            polled.setdefault(key, value)
+    if CONF_ADDRESS in polled:
+        cg.add(rego.register_polled_sensor(
+            polled[CONF_ADDRESS], polled.get(CONF_SIZE, 2),
+            polled.get(CONF_SIGNED, False), polled.get(CONF_MULTIPLIER, 1.0), var))
+        return
     
     can_id = 0
     if CONF_REGO_VARIABLE in config:
