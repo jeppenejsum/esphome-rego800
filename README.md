@@ -126,8 +126,8 @@ sensor:
 | T9 | 0x10014040 | Thermistor | Heat carrier in |
 | T10 | 0x10018040 | Thermistor | Cold carrier in |
 | T11 | 0x1001c040 | Thermistor | Cold carrier out |
-| HEAT_FLUID_PUMP | 0x8070040 | Regular | Heat fluid pump frequency |
-| COLD_FLUID_PUMP | 0x8074040 | Regular | Cold fluid pump frequency |
+| HEAT_FLUID_PUMP | 0x8070040 | Regular | Heat fluid pump speed signal (%) |
+| COLD_FLUID_PUMP | 0x8074040 | Regular | Cold fluid pump speed signal (%) |
 | COMPRESSOR | 0x80bc040 | Regular | Compressor frequency |
 
 ### Binary Sensors (binary_sensor.py)
