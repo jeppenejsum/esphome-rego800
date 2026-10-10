@@ -9,6 +9,7 @@ from esphome.const import (
     CONF_STEP,
     CONF_UNIT_OF_MEASUREMENT,
     UNIT_CELSIUS,
+    UNIT_HOUR,
 )
 
 from . import CONF_REGO800_ID, Rego800, rego800_ns
@@ -51,6 +52,20 @@ REGO_VARIABLES = {
         CONF_MAX_VALUE: 25,
         CONF_STEP: 1,
         CONF_UNIT_OF_MEASUREMENT: UNIT_CELSIUS,
+    },
+    # Extra hot water duration in whole hours (flags 21). Starting Extra
+    # varmvatten on the panel for 2 hours set it to 2 (plus XVV_KOMP_BEHOV and
+    # XVV_TILLSKOTT_BEHOV); cancelling on the panel set it back to 0. The
+    # panel's upper limit is not known; 24 is a cap chosen here.
+    "XVV_TID": {
+        CONF_ADDRESS: 0x2EB,
+        CONF_SIZE: 1,
+        CONF_SIGNED: False,
+        CONF_MULTIPLIER: 1.0,
+        CONF_MIN_VALUE: 0,
+        CONF_MAX_VALUE: 24,
+        CONF_STEP: 1,
+        CONF_UNIT_OF_MEASUREMENT: UNIT_HOUR,
     },
     # Heat curve end points (flow temperature, x0.1 °C).
     "RADKURVA_VANSTER_Y": _temp(0x275, 15, 50),

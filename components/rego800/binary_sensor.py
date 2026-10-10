@@ -26,6 +26,13 @@ REGO_VARIABLES = {
     "KOMP_LARM": {CONF_ADDRESS: 0x244, CONF_DEVICE_CLASS: DEVICE_CLASS_PROBLEM},
     "LARM_MODE": {CONF_ADDRESS: 0x24C, CONF_DEVICE_CLASS: DEVICE_CLASS_PROBLEM},
     "FRYSVAKT": {CONF_ADDRESS: 0x172, CONF_DEVICE_CLASS: DEVICE_CLASS_PROBLEM},
+    # Electric heater power steps, relays 1, 3 and 5 per the installer
+    # manual. Relay 1 switched on first and all three were on at 100 % demand.
+    "HW_TILLSKOTT_RELA_1": {CONF_ADDRESS: 0x230, CONF_DEVICE_CLASS: DEVICE_CLASS_RUNNING},
+    "HW_TILLSKOTT_RELA_3": {CONF_ADDRESS: 0x232, CONF_DEVICE_CLASS: DEVICE_CLASS_RUNNING},
+    "HW_TILLSKOTT_RELA_5": {CONF_ADDRESS: 0x234, CONF_DEVICE_CLASS: DEVICE_CLASS_RUNNING},
+    # Extra hot water demand on the compressor; set while extra hot water runs.
+    "XVV_KOMP_BEHOV": {CONF_ADDRESS: 0x3BB, CONF_DEVICE_CLASS: DEVICE_CLASS_RUNNING},
 }
 
 CONFIG_SCHEMA = binary_sensor.binary_sensor_schema().extend(

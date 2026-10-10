@@ -72,6 +72,10 @@ REGO_VARIABLES = {
     # Degree-minutes (flags 0E: signed x0.1, scaling not yet checked against
     # the panel).
     "GRADMIN": {CONF_ADDRESS: 0x17D, CONF_SIZE: 2, CONF_SIGNED: True, CONF_MULTIPLIER: 0.1, CONF_ACCURACY_DECIMALS: 1},
+    # Electric heater demand in percent (flags 2A). Ramps up over the 60 s
+    # ramp time and reached 100 with all three heater relays on; the steps
+    # switch in at 33/67/99 % (installer manual, Ramptid elpatron).
+    "TILLSKOTT_UTSIGNAL": {CONF_ADDRESS: 0x2B4, CONF_SIZE: 2, CONF_SIGNED: False, CONF_MULTIPLIER: 1.0, CONF_UNIT_OF_MEASUREMENT: UNIT_PERCENT, CONF_ACCURACY_DECIMALS: 0},
 }
 
 CONFIG_SCHEMA = sensor.sensor_schema(state_class=STATE_CLASS_MEASUREMENT).extend(
