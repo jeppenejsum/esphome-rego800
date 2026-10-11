@@ -55,6 +55,13 @@ REGO_VARIABLES = {
     # panel.
     # Calculated flow temperature setpoint (flags 0E: signed x0.1 °C).
     "RAD_BORVARDE": {CONF_ADDRESS: 0x25E, CONF_SIZE: 2, CONF_SIGNED: True, CONF_MULTIPLIER: 0.1, CONF_UNIT_OF_MEASUREMENT: UNIT_CELSIUS, CONF_ACCURACY_DECIMALS: 1, CONF_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE},
+    # Outdoor temperature as the controller uses it for the heat curve
+    # (flags 0E: signed x0.1 °C). On an X15 it read 11.9 while the T2 frame
+    # and HW_GT2_TEMP read 14.3-14.4, so it includes a correction or filter.
+    "GT2_TEMP": {CONF_ADDRESS: 0x19D, CONF_SIZE: 2, CONF_SIGNED: True, CONF_MULTIPLIER: 0.1, CONF_UNIT_OF_MEASUREMENT: UNIT_CELSIUS, CONF_ACCURACY_DECIMALS: 1, CONF_DEVICE_CLASS: DEVICE_CLASS_TEMPERATURE},
+    # T2 sensor correction setting (flags 6D, 1 byte; signed x0.1 °C inferred
+    # from the flag bits).
+    "GT2_KORRIGERING": {CONF_ADDRESS: 0x19B, CONF_SIZE: 1, CONF_SIGNED: True, CONF_MULTIPLIER: 0.1, CONF_UNIT_OF_MEASUREMENT: UNIT_CELSIUS, CONF_ACCURACY_DECIMALS: 1},
     # Compressor drive current (flags 0A, scale guessed as x0.1 A).
     "HW_KOMP_CURRENT": {CONF_ADDRESS: 0x20B, CONF_SIZE: 2, CONF_SIGNED: False, CONF_MULTIPLIER: 0.1, CONF_UNIT_OF_MEASUREMENT: UNIT_AMPERE, CONF_ACCURACY_DECIMALS: 1, CONF_DEVICE_CLASS: DEVICE_CLASS_CURRENT},
     # Compressor drive voltage (flags 02: unsigned 16-bit, unit guessed as V).
