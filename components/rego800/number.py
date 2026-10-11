@@ -10,6 +10,7 @@ from esphome.const import (
     CONF_UNIT_OF_MEASUREMENT,
     UNIT_CELSIUS,
     UNIT_HOUR,
+    UNIT_PERCENT,
 )
 
 from . import CONF_REGO800_ID, Rego800, rego800_ns
@@ -70,6 +71,42 @@ REGO_VARIABLES = {
     # Heat curve end points (flow temperature, x0.1 °C).
     "RADKURVA_VANSTER_Y": _temp(0x275, 15, 50),
     "RADKURVA_HOGER_Y": _temp(0x271, 25, 80),
+    # Settings for the panel's Up/Down heat change (++ + = - --). Above the
+    # outdoor limit a press scales the left end, below it the right end, by
+    # the normal (+/-) or large (++/--) percentage. Factory values per the
+    # installer manual: 10 °C, 3 % and 8 %. The panel on firmware 2.21.0 has
+    # no menu for them. Sizes follow from the name table; the limit's
+    # signedness is a guess.
+    "RADKURVA_VH_GRANSVARDE": {
+        CONF_ADDRESS: 0x277,
+        CONF_SIZE: 1,
+        CONF_SIGNED: True,
+        CONF_MULTIPLIER: 1.0,
+        CONF_MIN_VALUE: -20,
+        CONF_MAX_VALUE: 20,
+        CONF_STEP: 1,
+        CONF_UNIT_OF_MEASUREMENT: UNIT_CELSIUS,
+    },
+    "RADKURVA_NORMAL_PROCENT": {
+        CONF_ADDRESS: 0x274,
+        CONF_SIZE: 1,
+        CONF_SIGNED: False,
+        CONF_MULTIPLIER: 1.0,
+        CONF_MIN_VALUE: 0,
+        CONF_MAX_VALUE: 20,
+        CONF_STEP: 1,
+        CONF_UNIT_OF_MEASUREMENT: UNIT_PERCENT,
+    },
+    "RADKURVA_MYCKET_PROCENT": {
+        CONF_ADDRESS: 0x273,
+        CONF_SIZE: 1,
+        CONF_SIGNED: False,
+        CONF_MULTIPLIER: 1.0,
+        CONF_MIN_VALUE: 0,
+        CONF_MAX_VALUE: 30,
+        CONF_STEP: 1,
+        CONF_UNIT_OF_MEASUREMENT: UNIT_PERCENT,
+    },
     # Local curve adjustments, signed x0.1 °C, for outdoor points -35 (Y1) to
     # +20 °C (Y12) in 5 °C steps. The panel shows end point + adjustment, e.g.
     # left end 29.4 + Y12 -10.0 = 19 at +20 °C.
