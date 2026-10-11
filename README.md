@@ -224,6 +224,8 @@ template buttons:
 - `id(rego).start_scan(0x000, 0x7FF)` reads every controller variable. The
   first scan records a baseline; later scans log only the variables that
   changed, so changing one setting on the panel between two scans finds it.
+  It skips 0x303 (`REMOTE_GET_DISPLAY`), which streams the panel's screen
+  and appeared to reboot the display on an IVT X15 (firmware 2.21.0).
 - `id(rego).dump_scan()` lists the recorded scan values.
 - `id(rego).read_names()` reads the controller's variable-name table (var
   0x7F6) and logs it. It arrives as a burst of ~1700 frames, so set

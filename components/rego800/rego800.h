@@ -172,6 +172,9 @@ protected:
   static const uint16_t SCAN_VARS = 0x800;
   static const uint16_t NAMES_INFO_VAR = 0x7F5;
   static const uint16_t NAMES_VAR = 0x7F6;
+  // REMOTE_GET_DISPLAY streams the panel's screen; reading it in a scan
+  // stalls the bus and appears to reboot the display.
+  static const uint16_t DISPLAY_VAR = 0x303;
   static const size_t NAMES_BUF_SIZE = 16384;
   struct ScanEntry {
     uint8_t len;  // 0xFF = no reply yet

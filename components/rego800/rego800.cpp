@@ -96,7 +96,8 @@ void Rego800::loop() {
     return;
 
   // The name table streams many frames per request; read_names() handles it.
-  if (this->scan_next_ == NAMES_VAR)
+  // The display variable streams screen data and seems to reboot the panel.
+  if (this->scan_next_ == NAMES_VAR || this->scan_next_ == DISPLAY_VAR)
     this->scan_next_++;
 
   // One extra interval after the last request lets its reply arrive.
