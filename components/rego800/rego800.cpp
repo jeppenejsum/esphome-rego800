@@ -96,7 +96,7 @@ void Rego800::loop() {
     return;
 
   // The name table streams many frames per request; read_names() handles it.
-  // The display variable streams screen data and seems to reboot the panel.
+  // The display variable streams screen data and stalls the CAN handling.
   if (this->scan_next_ == NAMES_VAR || this->scan_next_ == DISPLAY_VAR)
     this->scan_next_++;
 
